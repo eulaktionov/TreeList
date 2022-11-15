@@ -153,10 +153,7 @@ namespace TreeList
         private void LoadFile(object? sender, EventArgs e)
         {
             string? filePath = list?.SelectedItems[0].Tag?.ToString()??"";
-            string myFavoritesPath =
-               Environment.GetFolderPath(Environment.SpecialFolder.Favorites);
-
-            /*switch(Path.GetExtension(filePath))
+            switch(Path.GetExtension(filePath))
             {
                 case ".txt":
                     Process.Start("\"C:\\Program Files (x86)\\Notepad++\\notepad++.exe\"",
@@ -166,7 +163,7 @@ namespace TreeList
                     Process.Start("\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe\"",
                         filePath);
                     break;
-            }*/
+            }
         }
     }
 }
