@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection.Metadata.Ecma335;
+using System.Xml.Linq;
 
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 using static TreeList.Properties.Resources;
@@ -9,9 +10,10 @@ namespace TreeList
     public partial class Start : Form
     {
         const string AppTitle = "Дерево папок + список файлов";
+        const string AccessDeniedMsg = " /*Отказано в доступе*/ ";
 
-        TreeView tree;
-        ListView list;
+        TreeView? tree;
+        ListView? list;
 
         public Start()
         {
@@ -19,7 +21,7 @@ namespace TreeList
             MakeControls();
             SetForm();
         }
-        
+
         void MakeControls()
         {
             tree = new TreeView();
@@ -44,9 +46,9 @@ namespace TreeList
             list.View = View.Details;
             list.FullRowSelect = true;
             list.GridLines = true;
-            list.Columns.Add("Files");
-            list.SizeChanged += (sender, e) =>
-                list.Columns[0].Width = (sender as ListView).Width;
+            list.Columns.Add("Ф А Й Л Ы   В   П А П К Е :");
+            list.SizeChanged += (sender, e) => list.Columns[0].Width = (sender as ListView)?.Width ?? 0;
+            list.DoubleClick += LoadFile;
             return list;
         }
         TableLayoutPanel MakeTabLayoutPanel(int colCount)
@@ -69,8 +71,7 @@ namespace TreeList
                 LoadTreeImage, "Загрузить дерево", LoadFolderTree));
             return toolStrip;
         }
-        ToolStripButton MakeToolStripButton(
-            Image image, string text, EventHandler handler)
+        ToolStripButton MakeToolStripButton(Image image, string text, EventHandler handler)
         {
             ToolStripButton button = new ToolStripButton();
             button.DisplayStyle = ToolStripItemDisplayStyle.Image;
@@ -80,32 +81,38 @@ namespace TreeList
             button.Alignment = ToolStripItemAlignment.Right;
             return button;
         }
-        
+
         void LoadFolderTree(object? sender, EventArgs e)
         {
             FolderBrowserDialog dialog = new FolderBrowserDialog();
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                tree.Nodes.Clear();
-                tree.Nodes.Add(dialog.SelectedPath);
-                LoadFolderTree(dialog.SelectedPath, tree.Nodes[0]);
-                tree.Nodes[0].Expand();
+                tree?.Nodes.Clear();
+
+                var root = new TreeNode(dialog.SelectedPath);
+                root.Tag = new DirectoryInfo(root.Text);
+                tree?.Nodes.Add(root);
+
+                LoadFolderTree(root);
+                tree?.Nodes[0].Expand();
             }
         }
-        void LoadFolderTree(string dirPath, TreeNode parent)
+        void LoadFolderTree(TreeNode? parent)
         {
-            string[] folders = Directory.GetDirectories(dirPath);
-            foreach (var folder in folders)
+            var folders = Directory.GetDirectories(parent?.Tag?.ToString() ?? "");
+            foreach (var it in folders)
             {
-                TreeNode node = new TreeNode(folder);
-                parent.Nodes.Add(node);
+                var folder = new DirectoryInfo(it);
+                var node = new TreeNode(folder.Name);
+                node.Tag = folder;
+                parent?.Nodes.Add(node);
                 try
                 {
-                    LoadFolderTree(folder, node);
+                    LoadFolderTree(node);
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    node.Text += "(Отказано в доступе)";
+                    node.Text += AccessDeniedMsg;
                 }
                 catch (Exception ex)
                 {
@@ -115,16 +122,51 @@ namespace TreeList
         }
         private void LoadFolderFiles(object? sender, EventArgs e)
         {
-            list.Items.Clear();
-            string dirPath = tree.SelectedNode.Text;
-            string[] files = Directory.GetFiles(dirPath);
+            list?.Items.Clear();
+            string? dirPath = tree?.SelectedNode?.Tag?.ToString();
+            if (dirPath == null) return;
+
+            string[]? files = null;
+            try
+            {
+                files = Directory.GetFiles(dirPath);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show(AccessDeniedMsg, AppTitle);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, AppTitle);
+            }
+            if (files == null) return;
+
             foreach (var it in files)
             {
                 FileInfo file = new FileInfo(it);
                 ListViewItem item = new ListViewItem();
                 item.Text = file.Name;
-                list.Items.Add(item);
+                item.Tag = file;
+                list?.Items.Add(item);
             }
+        }
+        private void LoadFile(object? sender, EventArgs e)
+        {
+            string? filePath = list?.SelectedItems[0].Tag?.ToString()??"";
+            string myFavoritesPath =
+               Environment.GetFolderPath(Environment.SpecialFolder.Favorites);
+
+            /*switch(Path.GetExtension(filePath))
+            {
+                case ".txt":
+                    Process.Start("\"C:\\Program Files (x86)\\Notepad++\\notepad++.exe\"",
+                        filePath);
+                    break;
+                case ".sln":
+                    Process.Start("\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe\"",
+                        filePath);
+                    break;
+            }*/
         }
     }
 }
